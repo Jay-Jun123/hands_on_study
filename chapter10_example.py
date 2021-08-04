@@ -171,3 +171,131 @@ print(y_pred_main, y_pred_aux)
 
 
 #서브클래싱 API로 동적 모델 만들기
+class WideAndDeepModel(keras.Model):
+    def __init__(self, units=30, activation="relu", **kwargs):
+        super().__init__(**kwargs)
+        self.hidden1 = keras.layers.Dense(units, activation=activation)
+        self.hidden2 = keras.layers.Dense(units, activation=activation)
+        self.main_output = keras.layers.Dense(1)
+        self.aux_output = keras.layers.Dense(1)
+
+def call(self, inputs):
+    input_A, input_B = inputs
+    hidden1 = self.hidden1(input_B)
+    hidden2 = self.hidden2(hidden1)
+    concat = keras.layers.concatenate([input_A, hidden2])
+    main_output = self.main_output(concat)
+    aux_output = self.aux_output(hidden2)
+    return main_output, aux_output
+
+model = WideAndDeepModel()
+
+#################################error#################################
+#모델 저장과 복원#################################error#################################
+model = keras.models([...])
+model = keras.models.Sequential([...])
+model.compile([...])
+model.fit([...])
+model.save("my_keras_model.h5")
+
+model = keras.models.load_model("my_keras_model.h5")
+
+
+#콜백 사용하기
+checkpoint_cb = keras.callbacks.ModellCheckpoint("my_keras_model.h5")
+history = model.fit(X_train, y_train, epochs=10, callback=[checkpoint_cb])
+
+checkpoint_cb = keras.callbacks.ModelCheckpoint("my_keras_model.h5", 
+                                                save_best_only=True)
+history = model.fit(X_train, y_train, epochs=10,
+                    validation_data=(X_valid, y_valid),
+                    callbacks=[checkpoint_cb])
+model = keras.models.load_model("my_keras_model.h5")
+
+early_stopping_cb = keras.callbacks.EarlyStopping(patience=10,
+                                                  restore_best_weights=True)
+history = model.fit(X_train, y_train, epochs=100,
+                    validation_data=(X_valid, y_valid),
+                    callbacks=[checkpoint_cb, early_stopping_cb])
+
+class PrintValTainRatioCallback(keras.callbacks.Callback):
+    def on_epoch_end(self, epoch, logs):
+        print("\nval/train: {:.2f}".format(logs["val_loss"] / logs["loss"]))
+#################################error#################################
+
+#텐서보드를 사용해 시각화하기
+import os
+root_logdir = os.path.join(os.curdir, "my_logs")
+
+def get_run_logdir():
+    import time
+    run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
+    return os.path.join(root_logdir, run_id)
+
+run_logdir = get_run_logdir()
+
+#################################error#################################
+[...]
+tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
+history = model.fit(X_train, y_train, epochs=30,
+                    validation_data=(X_valid, y_valid),
+                    callback=[tensorboard_cb])
+
+
+#cmd에 python -m tensorboard.main 입력 - error
+%load_ext tensorboard
+%tensorboard --logdir=./my_logs --port=6006
+
+test_logdir = get_run_logdir()
+writer = tf.summary.create_file_writer(test_logdir)
+with writer.as_default():
+    for step in range(1, 1000 + 1):
+        tf.summary.scalar("my_scalar", np.sin(step / 10), step=step)
+        data = (np.random.randn(100) + 2) * step / 100
+        tf.summary.histogram("my_hist", data, buckets=50, step=step)
+        images = np.random.rand(2, 32, 32, 3)
+        tf.summary.image("my_images", images * step / 1000, step=step)
+        texts = ["The step is" + str(step), "Its square is" + str(step**2)]
+        tf.summary.text("my_text", texts, step=step)
+        sine_wave = tf.math.sin(tf.range(12000) / 48000 *2 * np.pi * step)
+        audio = tf.reshape(tf.cast(sine_wave, tf.float32), [1, -1, 1])
+        tf.summary.audio("my_audio", audio, sample_rate=48000, step=step)
+
+#################################error#################################
+
+#신경망 하이퍼파라미터 튜닝
+def build_model(n_hidden=1, n_neurons=30, learning_rate=3e-3, input_shape=[8]):
+    model = keras.models.Sequential()
+    model.add(keras.layers.InputLayer(input_shape=input_shape))
+    for layer in range(n_hidden):
+        model.add(keras.layers.Dense(n_neurons, activation="relu"))
+    model.add(keras.layers.Dense(1))
+    optimizer = keras.optimizers.SGD(lr=learning_rate)
+    model.compile(loss="mse", optimizer=optimizer)
+    return model
+
+keras_reg = keras.wrappers.scikit_learn.KerasRegressor(build_model)
+
+keras_reg.fit(X_train, y_train, epochs=100,
+              validation_data=(X_valid, y_valid),
+              callbacks=[keras.callbacks.EarlyStopping(patience=10)])
+mse_test = keras_reg.score(X_test, y_test)
+y_pred = keras_reg.predict(X_new)
+
+from scipy.stats import reciprocal
+from sklearn.model_selection import RandomizedSearchCV
+
+param_distribs = {
+    "n_hidden": [0, 1, 2, 3],
+    "n_neurons": np.arange(1, 100),
+    "learning_rate": reciprocal(3e-4, 3e-2),
+}
+
+rnd_search_cv = RandomizedSearchCV(keras_reg, param_distribs, n_iter=10, cv=3)
+rnd_search_cv.fit(X_train, y_train, epochs=10,
+                  validation_data=(X_valid, y_valid),
+                  callbacks=[keras.callbacks.EarlyStopping(patience=10)])
+#무한로딩
+rnd_search_cv.best_params_
+rnd_search_cv.best_score_
+model = rnd_search_cv.best_estimator_.model
