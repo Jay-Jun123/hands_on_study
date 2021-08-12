@@ -15,7 +15,7 @@ print(y_pred)
 
 #텐서플로우, 케라스 설치
 #cmd 창에서 python -m install -U tensorflow 실행
-import tensorflow as tensorflow
+import tensorflow as tf
 from tensorflow import keras
 tf.__version__
 keras.__version__
@@ -190,12 +190,20 @@ def call(self, inputs):
 
 model = WideAndDeepModel()
 
-#################################error#################################
-#모델 저장과 복원#################################error#################################
-model = keras.models([...])
-model = keras.models.Sequential([...])
-model.compile([...])
-model.fit([...])
+#################################...에 필요한 옵션 추가#################################
+#모델 저장과 복원
+#model = keras.models([...])
+#model = keras.models.Sequential([...])
+#model.compile([...])
+#model.fit([...])
+model = keras.models.Sequential([
+    keras.layers.Dense(30, activation="relu", input_shape=[8]),
+    keras.layers.Dense(30, activation="relu"),
+    keras.layers.Dense(1)
+])    
+model.compile(loss="mse", optimizer=keras.optimizers.SGD(lr=1e-3))
+history = model.fit(X_train, y_train, epochs=10, validation_data=(X_valid, y_valid))
+mse_test = model.evaluate(X_test, y_test)
 model.save("my_keras_model.h5")
 
 model = keras.models.load_model("my_keras_model.h5")
@@ -221,7 +229,7 @@ history = model.fit(X_train, y_train, epochs=100,
 class PrintValTainRatioCallback(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs):
         print("\nval/train: {:.2f}".format(logs["val_loss"] / logs["loss"]))
-#################################error#################################
+
 
 #텐서보드를 사용해 시각화하기
 import os
@@ -234,18 +242,25 @@ def get_run_logdir():
 
 run_logdir = get_run_logdir()
 
-#################################error#################################
-[...]
+#[...]
+keras.backend.clear_session()
+model = keras.models.Sequential([
+    keras.layers.Dense(30, activation="relu", input_shape=[8]),
+    keras.layers.Dense(30, activation="relu"),
+    keras.layers.Dense(1)
+])
+model.compile(loss="mse", optimizer=keras.optimizers.SGD(lr=1e-3))
+
 tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
 history = model.fit(X_train, y_train, epochs=30,
                     validation_data=(X_valid, y_valid),
-                    callback=[tensorboard_cb])
+                    callbacks=[tensorboard_cb])
 
-
-#cmd에 python -m tensorboard.main 입력 - error
-%load_ext tensorboard
-%tensorboard --logdir=./my_logs --port=6006
-
+# %는 cmd에서 실행하라는 뜻, my_logs에는 이미지를 저장한 위치
+# 본인은 ./my_logs를 C:\Users\israf\Desktop\github\github_push_folder\my_logs\run_2021_08_12-10_59_11로 변경
+# &python -m tensorboard.main 입력 - error
+# %load_ext tensorboard - error
+# %tensorboard --logdir=./my_logs --port=6006
 test_logdir = get_run_logdir()
 writer = tf.summary.create_file_writer(test_logdir)
 with writer.as_default():
@@ -260,8 +275,6 @@ with writer.as_default():
         sine_wave = tf.math.sin(tf.range(12000) / 48000 *2 * np.pi * step)
         audio = tf.reshape(tf.cast(sine_wave, tf.float32), [1, -1, 1])
         tf.summary.audio("my_audio", audio, sample_rate=48000, step=step)
-
-#################################error#################################
 
 #신경망 하이퍼파라미터 튜닝
 def build_model(n_hidden=1, n_neurons=30, learning_rate=3e-3, input_shape=[8]):
@@ -295,7 +308,12 @@ rnd_search_cv = RandomizedSearchCV(keras_reg, param_distribs, n_iter=10, cv=3)
 rnd_search_cv.fit(X_train, y_train, epochs=10,
                   validation_data=(X_valid, y_valid),
                   callbacks=[keras.callbacks.EarlyStopping(patience=10)])
-#무한로딩
+
 rnd_search_cv.best_params_
 rnd_search_cv.best_score_
 model = rnd_search_cv.best_estimator_.model
+
+#책 이후 추가 code
+rnd_search_cv.score(X_test, y_test)
+model = rnd_search_cv.best_estimator_.model
+model.evaluate(X_test, y_test)
